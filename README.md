@@ -2,15 +2,18 @@
 
 **TechNest Slack Bot** sends weekly TechNest progress updates to **Chan Meng** on Slack.
 
+Default delivery mode: **Channel** via `SLACK_CHANNEL_ID`. User/DM delivery is available as an optional fallback.
+
 Default schedule: **every Sunday at 12:00 PM** with the message **"Hello Chan"**.
 
 This project includes:
 
 - An editable web dashboard (Next.js on Vercel)
 - Persistent bot settings (JSON file locally, Vercel KV in production)
+- Channel-first Slack delivery with optional user/DM fallback
 - API routes for health checks, settings, and manual test sends
 - A Vercel Cron job for weekly delivery in production
-- Local CLI scripts (`npm run send`, `npm run schedule`)
+- Local CLI scripts (`npm run send`, `npm run schedule`, `npm run check-slack`)
 
 ---
 
@@ -25,8 +28,8 @@ cp .env.example .env
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `SLACK_BOT_TOKEN` | Yes | Bot User OAuth Token (`xoxb-...`) from [api.slack.com/apps](https://api.slack.com/apps) |
-| `SLACK_USER_ID` | Recommended | Chan Meng's Slack member ID (`U...`). Opens a DM automatically. |
-| `SLACK_CHANNEL_ID` | Optional | Fallback DM channel ID (`D0ATNMZ78AH` from your huddle URL) |
+| `SLACK_CHANNEL_ID` | Yes (channel mode) | Target channel or DM ID (`C...` or `D...`) the bot belongs to |
+| `SLACK_USER_ID` | Optional | Fallback user ID (`U...`) for User delivery mode |
 | `MESSAGE_TEXT` | No | Default weekly message (default: `Hello Chan`) |
 | `SCHEDULE_CRON` | No | Default cron expression (default: `0 12 * * 0`) |
 | `BOT_STATUS` | No | Default bot status: `Active` or `Paused` |
@@ -39,12 +42,72 @@ Never commit `.env`. It is listed in `.gitignore`.
 
 ---
 
+## Channel setup (primary mode)
+
+Channel delivery posts directly with:
+
+```javascript
+client.chat.postMessage({
+  channel: SLACK_CHANNEL_ID,
+  text,
+});
+```
+
+No `conversations.open()` is used in channel mode.
+
+### Step 1 — Choose a channel
+
+Use any Slack channel or DM the bot can access:
+
+- Public channel: `C...`
+- Private channel: `C...` (bot must be invited)
+- DM: `D...` (bot must be invited with `/invite @YourBotName`)
+
+### Step 2 — Invite the bot
+
+1. Open the target channel in Slack
+2. Run `/invite @YourBotName`
+3. Confirm the bot appears in the member list
+
+### Step 3 — Copy the channel ID
+
+1. Right-click the channel name → **View channel details**
+2. Scroll to the bottom and copy the channel ID
+3. Add to `.env`:
+
+```env
+SLACK_CHANNEL_ID=C0123456789
+```
+
+Or use a DM ID from a huddle link (e.g. `D0ATNMZ78AH`) **only if the bot was invited to that DM**.
+
+### Step 4 — Verify
+
+```bash
+npm run check-slack
+npm run send
+```
+
+---
+
+## User delivery (optional fallback)
+
+Switch **Destination type** to **User** on the dashboard to send via DM using `conversations.open()`.
+
+1. Copy a member ID from Slack (profile → **Copy member ID**)
+2. Save it on the dashboard or set `SLACK_USER_ID=U...` in `.env`
+3. Requires `im:write` scope on your Slack app
+
+---
+
 ## Editable dashboard
 
 Open the app in your browser and use the dashboard to manage bot settings.
 
 ### What you can edit
 
+- **Destination type** — `Channel` (default) or `User`
+- **Channel ID** or **User ID** — saved to persistent storage
 - **Weekly message** — the Slack message text
 - **Schedule cron expression** — e.g. `0 12 * * 0`
 - **Status** — `Active` or `Paused`
@@ -59,12 +122,12 @@ Open the app in your browser and use the dashboard to manage bot settings.
 On first load:
 
 1. Saved settings are loaded if they exist
-2. Otherwise `.env` defaults are used (`MESSAGE_TEXT`, `SCHEDULE_CRON`, `BOT_STATUS`)
+2. Otherwise `.env` defaults are used
 
 ### Save and test
 
 1. Enter your `TEST_API_SECRET` in the **API secret** field
-2. Edit message, cron, or status
+2. Choose **Channel** or **User**, set the destination ID, message, cron, and status
 3. Click **Save settings** to persist changes
 4. Click **Send test message** to send the current message immediately
 
@@ -93,8 +156,8 @@ Save and test actions require `TEST_API_SECRET`. Random visitors cannot change s
 
 **OAuth & Permissions** → **Bot Token Scopes**:
 
-- `chat:write`
-- `im:write`
+- `chat:write` — post messages to channels
+- `im:write` — only needed for User delivery mode
 
 ### Step 3 — Install and copy token
 
@@ -102,13 +165,9 @@ Save and test actions require `TEST_API_SECRET`. Random visitors cannot change s
 2. Copy **Bot User OAuth Token** (`xoxb-...`)
 3. Paste it into `.env` as `SLACK_BOT_TOKEN`
 
-### Step 4 — Find Chan's Slack user ID
+### Step 4 — Set the channel ID
 
-1. Open Chan Meng's Slack profile
-2. Click **More** → **Copy member ID**
-3. Paste into `.env` as `SLACK_USER_ID`
-
-Alternatively, keep using `SLACK_CHANNEL_ID=D0ATNMZ78AH` from your huddle URL.
+Follow [Channel setup (primary mode)](#channel-setup-primary-mode) above.
 
 ---
 
@@ -125,6 +184,12 @@ Open [http://localhost:3000](http://localhost:3000) for the dashboard.
 
 ```bash
 npm run send
+```
+
+### Validate Slack config
+
+```bash
+npm run check-slack
 ```
 
 ### Run the local weekly scheduler
@@ -148,19 +213,20 @@ The local scheduler reads saved settings from `data/settings.json` when availabl
 | `/api/send-message` | POST | Manual test send (requires `TEST_API_SECRET`) |
 | `/api/cron/send-message` | GET | Weekly send for Vercel Cron (requires `CRON_SECRET`) |
 
-### Read settings
-
-```bash
-curl http://localhost:3000/api/settings
-```
-
 ### Save settings
 
 ```bash
 curl -X POST http://localhost:3000/api/settings \
   -H "Authorization: Bearer YOUR_TEST_API_SECRET" \
   -H "Content-Type: application/json" \
-  -d '{"messageText":"Hello Chan","scheduleCron":"0 12 * * 0","status":"Active"}'
+  -d '{
+    "messageText":"Hello Chan",
+    "scheduleCron":"0 12 * * 0",
+    "status":"Active",
+    "destinationType":"channel",
+    "slackChannelId":"C0123456789",
+    "slackUserId":""
+  }'
 ```
 
 ### Test send
@@ -193,7 +259,7 @@ Without KV, dashboard edits on Vercel will not persist across requests.
 Required:
 
 - `SLACK_BOT_TOKEN`
-- `SLACK_USER_ID` (or `SLACK_CHANNEL_ID`)
+- `SLACK_CHANNEL_ID`
 - `MESSAGE_TEXT`
 - `SCHEDULE_CRON`
 - `BOT_STATUS`
@@ -202,30 +268,13 @@ Required:
 - `KV_REST_API_URL`
 - `KV_REST_API_TOKEN`
 
-Using Vercel CLI:
+Optional:
 
-```bash
-npx vercel env add SLACK_BOT_TOKEN
-npx vercel env add TEST_API_SECRET
-npx vercel env add CRON_SECRET
-```
+- `SLACK_USER_ID` (User delivery mode only)
 
 ### 4. Vercel Cron schedule
 
-[`vercel.json`](vercel.json) runs the weekly job:
-
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/send-message",
-      "schedule": "0 12 * * 0"
-    }
-  ]
-}
-```
-
-**Important:** Vercel Cron uses **UTC**. The cron handler reads saved settings and skips sending when status is `Paused`.
+[`vercel.json`](vercel.json) runs the weekly job on Sunday 12:00 PM UTC. The handler reads saved settings and skips sending when status is `Paused`.
 
 ---
 
@@ -241,14 +290,15 @@ slack/
 │       ├── send-message/route.ts
 │       └── cron/send-message/route.ts
 ├── lib/
-│   ├── slack.js                 # Slack send logic
+│   ├── slack.js                 # Channel-first Slack send logic
 │   ├── settings.js              # Settings storage
 │   └── auth.js                  # TEST_API_SECRET checks
 ├── data/
 │   └── settings.json            # Local saved settings (gitignored)
 ├── src/
 │   ├── send-message.js          # Local CLI send
-│   └── schedule.js              # Local cron scheduler
+│   ├── schedule.js              # Local cron scheduler
+│   └── check-slack.js           # Config validation
 └── vercel.json
 ```
 
@@ -259,10 +309,12 @@ slack/
 | Error | Fix |
 |-------|-----|
 | `SLACK_BOT_TOKEN is missing` | Add token to `.env` or Vercel env vars |
+| `Channel not found` | Confirm channel ID, invite bot with `/invite @YourBotName` |
+| `The bot is not in this channel` | Invite the bot to the target channel |
+| `No channel ID configured` | Set `SLACK_CHANNEL_ID` in `.env` or save one on the dashboard |
 | `Unauthorized` on save/test | Set `TEST_API_SECRET` and enter it on the dashboard |
 | Settings reset on Vercel | Create and link a Vercel KV store |
 | Scheduled send still runs while Paused | Confirm you clicked **Save settings** and status is `Paused` |
-| `Message cannot be empty` | Enter text before saving or testing |
 
 ---
 

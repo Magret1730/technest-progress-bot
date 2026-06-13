@@ -10,6 +10,9 @@ type SettingsBody = {
   messageText?: string;
   scheduleCron?: string;
   status?: string;
+  destinationType?: string;
+  slackChannelId?: string;
+  slackUserId?: string;
 };
 
 export async function GET() {

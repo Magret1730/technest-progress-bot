@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
+type DestinationType = 'channel' | 'user';
+
 type BotSettings = {
   appName: string;
   description: string;
@@ -9,6 +11,10 @@ type BotSettings = {
   scheduleCron: string;
   scheduleDescription: string;
   status: 'Active' | 'Paused';
+  destinationType: DestinationType;
+  destinationLabel: string;
+  slackChannelId: string;
+  slackUserId: string;
   source: 'saved' | 'defaults';
   storage: 'kv' | 'file';
   testSendEnabled: boolean;
@@ -53,6 +59,10 @@ export default function HomePage() {
   const [messageText, setMessageText] = useState('');
   const [scheduleCron, setScheduleCron] = useState('');
   const [botStatus, setBotStatus] = useState<'Active' | 'Paused'>('Active');
+  const [destinationType, setDestinationType] =
+    useState<DestinationType>('channel');
+  const [slackChannelId, setSlackChannelId] = useState('');
+  const [slackUserId, setSlackUserId] = useState('');
   const [secret, setSecret] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState<'save' | 'send' | null>(null);
@@ -63,6 +73,14 @@ export default function HomePage() {
     [scheduleCron]
   );
 
+  const destinationSummary = useMemo(() => {
+    if (destinationType === 'user') {
+      return slackUserId ? `User ${slackUserId}` : 'User (not set)';
+    }
+
+    return slackChannelId ? `Channel ${slackChannelId}` : 'Channel (not set)';
+  }, [destinationType, slackChannelId, slackUserId]);
+
   useEffect(() => {
     fetch('/api/settings')
       .then((res) => res.json())
@@ -71,6 +89,9 @@ export default function HomePage() {
         setMessageText(data.messageText);
         setScheduleCron(data.scheduleCron);
         setBotStatus(data.status);
+        setDestinationType(data.destinationType || 'channel');
+        setSlackChannelId(data.slackChannelId || '');
+        setSlackUserId(data.slackUserId || '');
       })
       .catch(() => setStatusMessage('Could not load bot settings.'));
 
@@ -97,6 +118,9 @@ export default function HomePage() {
           messageText,
           scheduleCron,
           status: botStatus,
+          destinationType,
+          slackChannelId,
+          slackUserId,
         }),
       });
 
@@ -112,6 +136,9 @@ export default function HomePage() {
         setMessageText(data.settings.messageText);
         setScheduleCron(data.settings.scheduleCron);
         setBotStatus(data.settings.status);
+        setDestinationType(data.settings.destinationType);
+        setSlackChannelId(data.settings.slackChannelId);
+        setSlackUserId(data.settings.slackUserId);
       }
 
       setStatusMessage('Settings saved.');
@@ -174,17 +201,63 @@ export default function HomePage() {
             </dd>
           </div>
           <div>
+            <dt>Destination</dt>
+            <dd>{destinationSummary}</dd>
+          </div>
+          <div>
             <dt>Schedule preview</dt>
             <dd>{scheduleDescription}</dd>
           </div>
           <div>
             <dt>Settings source</dt>
-            <dd>{settings?.source === 'saved' ? 'Saved settings' : 'Environment defaults'}</dd>
+            <dd>
+              {settings?.source === 'saved'
+                ? 'Saved settings'
+                : 'Environment defaults'}
+            </dd>
           </div>
         </dl>
 
         {settings?.testSendEnabled ? (
           <form className="settings-form" onSubmit={handleSaveSettings}>
+            <label htmlFor="destinationType">Destination type</label>
+            <select
+              id="destinationType"
+              value={destinationType}
+              onChange={(event) =>
+                setDestinationType(event.target.value as DestinationType)
+              }
+            >
+              <option value="channel">Channel</option>
+              <option value="user">User</option>
+            </select>
+
+            {destinationType === 'channel' ? (
+              <>
+                <label htmlFor="slackChannelId">Channel ID</label>
+                <input
+                  id="slackChannelId"
+                  type="text"
+                  value={slackChannelId}
+                  onChange={(event) => setSlackChannelId(event.target.value)}
+                  placeholder="C1234567890 or D0ATNMZ78AH"
+                  required
+                />
+              </>
+            ) : (
+              <>
+                <label htmlFor="slackUserId">User ID</label>
+                <input
+                  id="slackUserId"
+                  type="text"
+                  value={slackUserId}
+                  onChange={(event) => setSlackUserId(event.target.value)}
+                  placeholder="U0123456789"
+                  required
+                />
+              </>
+            )}
+
             <label htmlFor="messageText">Weekly message</label>
             <textarea
               id="messageText"

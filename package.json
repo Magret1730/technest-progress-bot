@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "send": "node src/send-message.js",
-    "schedule": "node src/schedule.js"
+    "schedule": "node src/schedule.js",
+    "check-slack": "node src/check-slack.js"
   },
   "keywords": ["slack", "technest", "vercel"],
   "license": "MIT",
