@@ -2,19 +2,15 @@ import { NextResponse } from 'next/server';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { sendHelloChan, formatSlackError } = require('../../../lib/slack');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { getSettings, validateSettings } = require('../../../lib/settings');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { isTestAuthorized } = require('../../../lib/auth');
 
-function isAuthorized(request: Request, body: { secret?: string }) {
-  const expected = process.env.TEST_API_SECRET;
-  if (!expected) {
-    return false;
-  }
-
-  const header = request.headers.get('authorization');
-  const bearer = header?.startsWith('Bearer ') ? header.slice(7) : null;
-  const provided = bearer || body.secret;
-
-  return provided === expected;
-}
+type SendBody = {
+  secret?: string;
+  messageText?: string;
+};
 
 export async function POST(request: Request) {
   if (!process.env.TEST_API_SECRET) {
@@ -24,19 +20,27 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { secret?: string } = {};
+  let body: SendBody = {};
   try {
     body = await request.json();
   } catch {
     body = {};
   }
 
-  if (!isAuthorized(request, body)) {
+  if (!isTestAuthorized(request, body)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const result = await sendHelloChan();
+    const saved = await getSettings();
+    const messageText = body.messageText?.trim() || saved.messageText;
+    validateSettings({
+      messageText,
+      scheduleCron: saved.scheduleCron,
+      status: saved.status,
+    });
+
+    const result = await sendHelloChan({ messageText });
     return NextResponse.json({
       ok: true,
       channel: result.channel,
@@ -45,6 +49,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = formatSlackError(error as Error);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    const status = message.includes('cannot be empty') ? 400 : 500;
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

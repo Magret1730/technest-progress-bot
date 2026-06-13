@@ -1,31 +1,42 @@
 require('dotenv').config();
 
 const cron = require('node-cron');
-const { sendHelloChan, getConfig, formatSlackError } = require('../lib/slack');
+const { sendHelloChan, formatSlackError } = require('../lib/slack');
+const { getSettings } = require('../lib/settings');
 
-const DEFAULT_CRON = '0 12 * * 0';
-const expression = process.env.SCHEDULE_CRON || DEFAULT_CRON;
+async function startScheduler() {
+  const settings = await getSettings();
 
-if (!cron.validate(expression)) {
-  console.error(`Invalid SCHEDULE_CRON: "${expression}"`);
-  console.error('Example for Sunday 12:00 PM: 0 12 * * 0');
-  process.exit(1);
+  if (!cron.validate(settings.scheduleCron)) {
+    console.error(`Invalid schedule cron: "${settings.scheduleCron}"`);
+    process.exit(1);
+  }
+
+  console.log('Slack weekly scheduler running.');
+  console.log(`Message: "${settings.messageText}"`);
+  console.log(`Bot status: ${settings.status}`);
+  console.log(`Schedule: ${settings.scheduleCron} (${settings.scheduleDescription}, local time)`);
+  console.log('Press Ctrl+C to stop.\n');
+
+  cron.schedule(settings.scheduleCron, async () => {
+    const timestamp = new Date().toLocaleString();
+    try {
+      const current = await getSettings();
+
+      if (current.status === 'Paused') {
+        console.log(`[${timestamp}] Skipped: bot status is Paused`);
+        return;
+      }
+
+      const result = await sendHelloChan();
+      console.log(`[${timestamp}] Sent "${result.text}" to ${result.channel}`);
+    } catch (error) {
+      console.error(`[${timestamp}] Failed: ${formatSlackError(error)}`);
+    }
+  });
 }
 
-const { text, channel, userId } = getConfig();
-
-console.log('Slack weekly scheduler running.');
-console.log(`Message: "${text}"`);
-console.log(`Target: ${userId ? `user ${userId}` : `channel ${channel}`}`);
-console.log(`Schedule: ${expression} (local time)`);
-console.log('Press Ctrl+C to stop.\n');
-
-cron.schedule(expression, async () => {
-  const timestamp = new Date().toLocaleString();
-  try {
-    const result = await sendHelloChan();
-    console.log(`[${timestamp}] Sent "${result.text}" to ${result.channel}`);
-  } catch (error) {
-    console.error(`[${timestamp}] Failed: ${formatSlackError(error)}`);
-  }
+startScheduler().catch((error) => {
+  console.error(error.message);
+  process.exit(1);
 });

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { getPublicConfig } = require('../../../lib/slack');
+const { getSettings } = require('../../../lib/settings');
 
 export async function GET() {
-  return NextResponse.json(getPublicConfig());
+  const settings = await getSettings();
+  return NextResponse.json(settings);
 }

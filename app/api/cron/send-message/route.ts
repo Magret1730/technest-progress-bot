@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { sendHelloChan, formatSlackError } = require('../../../../lib/slack');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { getSettings } = require('../../../../lib/settings');
 
 function isCronAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -19,12 +21,25 @@ export async function GET(request: Request) {
   }
 
   try {
+    const settings = await getSettings();
+
+    if (settings.status === 'Paused') {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: 'Bot status is Paused',
+        status: settings.status,
+      });
+    }
+
     const result = await sendHelloChan();
     return NextResponse.json({
       ok: true,
+      skipped: false,
       channel: result.channel,
       text: result.text,
       ts: result.ts,
+      status: settings.status,
     });
   } catch (error) {
     const message = formatSlackError(error as Error);
