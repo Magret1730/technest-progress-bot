@@ -8,11 +8,10 @@ const { isTestAuthorized } = require('../../../lib/auth');
 type SettingsBody = {
   secret?: string;
   messageText?: string;
+  slackChannelId?: string;
+  scheduleMode?: string;
   scheduleCron?: string;
   status?: string;
-  destinationType?: string;
-  slackChannelId?: string;
-  slackUserId?: string;
 };
 
 export async function GET() {

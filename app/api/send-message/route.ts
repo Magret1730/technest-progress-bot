@@ -1,21 +1,22 @@
 import { NextResponse } from 'next/server';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { sendHelloChan, formatSlackError } = require('../../../lib/slack');
+const { sendMessage, formatSlackError } = require('../../../lib/slack');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { getSettings, validateSettings } = require('../../../lib/settings');
+const { validateSendInput } = require('../../../lib/settings');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { isTestAuthorized } = require('../../../lib/auth');
 
 type SendBody = {
   secret?: string;
   messageText?: string;
+  slackChannelId?: string;
 };
 
 export async function POST(request: Request) {
   if (!process.env.TEST_API_SECRET) {
     return NextResponse.json(
-      { error: 'Test send is disabled. Set TEST_API_SECRET in your environment.' },
+      { error: 'Send is disabled. Set TEST_API_SECRET in your environment.' },
       { status: 403 }
     );
   }
@@ -32,15 +33,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const saved = await getSettings();
-    const messageText = body.messageText?.trim() || saved.messageText;
-    validateSettings({
-      messageText,
-      scheduleCron: saved.scheduleCron,
-      status: saved.status,
-    });
-
-    const result = await sendHelloChan({ messageText });
+    const payload = validateSendInput(body);
+    const result = await sendMessage(payload);
     return NextResponse.json({
       ok: true,
       channel: result.channel,
@@ -49,7 +43,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = formatSlackError(error as Error);
-    const status = message.includes('cannot be empty') ? 400 : 500;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 }

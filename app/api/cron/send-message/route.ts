@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { sendHelloChan, formatSlackError } = require('../../../../lib/slack');
+const { sendMessage, formatSlackError } = require('../../../../lib/slack');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getSettings } = require('../../../../lib/settings');
 
@@ -23,6 +23,14 @@ export async function GET(request: Request) {
   try {
     const settings = await getSettings();
 
+    if (!settings.hasSavedSettings) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: 'No saved settings',
+      });
+    }
+
     if (settings.status === 'Paused') {
       return NextResponse.json({
         ok: true,
@@ -32,7 +40,16 @@ export async function GET(request: Request) {
       });
     }
 
-    const result = await sendHelloChan();
+    if (settings.scheduleMode !== 'weekly') {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: 'Schedule mode is not weekly',
+        scheduleMode: settings.scheduleMode,
+      });
+    }
+
+    const result = await sendMessage();
     return NextResponse.json({
       ok: true,
       skipped: false,
