@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { sendMessage, formatSlackError } = require('../../../../lib/slack');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { getSettings } = require('../../../../lib/settings');
+const { getSettings, isScheduleSendEnabled } = require('../../../../lib/settings');
 
 function isCronAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -31,21 +31,16 @@ export async function GET(request: Request) {
       });
     }
 
-    if (settings.status === 'Paused') {
+    if (!isScheduleSendEnabled({
+      scheduleMode: settings.scheduleMode,
+      scheduleCron: settings.scheduleCron,
+      status: settings.status,
+    })) {
       return NextResponse.json({
         ok: true,
         skipped: true,
-        reason: 'Bot status is Paused',
-        status: settings.status,
-      });
-    }
-
-    if (settings.scheduleMode !== 'weekly') {
-      return NextResponse.json({
-        ok: true,
-        skipped: true,
-        reason: 'Schedule mode is not weekly',
-        scheduleMode: settings.scheduleMode,
+        reason: 'No active weekly schedule',
+        scheduleStatus: settings.scheduleStatus,
       });
     }
 
@@ -56,7 +51,7 @@ export async function GET(request: Request) {
       channel: result.channel,
       text: result.text,
       ts: result.ts,
-      status: settings.status,
+      scheduleStatus: settings.scheduleStatus,
     });
   } catch (error) {
     const message = formatSlackError(error as Error);

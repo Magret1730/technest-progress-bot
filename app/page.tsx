@@ -1,80 +1,153 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type ScheduleMode = 'now' | 'weekly';
+type ScheduleStatus = 'No schedule active' | 'Schedule active' | 'Paused';
+type BotStatus = 'Active' | 'Paused' | 'Inactive';
 
 type BotSettings = {
   messageText: string;
   slackChannelId: string;
   scheduleMode: ScheduleMode;
   scheduleCron: string;
-  status: 'Active' | 'Paused';
+  scheduleDescription: string;
+  scheduleStatus: ScheduleStatus;
+  scheduleDayOfWeek: number;
+  scheduleTime: string;
+  status: BotStatus;
   hasSavedSettings: boolean;
+  hasActiveSchedule: boolean;
   testSendEnabled: boolean;
 };
 
 type ActionResult = {
   ok?: boolean;
   error?: string;
-  text?: string;
-  channel?: string;
+  message?: string;
+  settings?: BotSettings;
 };
 
-function describeCronClient(expression: string) {
-  const parts = expression.trim().split(/\s+/);
-  if (parts.length !== 5) {
+const DAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+function describeSchedulePreview(dayOfWeek: number, time: string) {
+  if (!time) {
     return '';
   }
 
-  const [minute, hour, , , dayOfWeek] = parts;
-  const days = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ];
-  const day = days[Number(dayOfWeek)] || `day ${dayOfWeek}`;
-  const hourNum = Number(hour);
-  const minuteNum = Number(minute);
-  const period = hourNum >= 12 ? 'PM' : 'AM';
-  const hour12 = hourNum % 12 || 12;
-  const minuteLabel = String(minuteNum).padStart(2, '0');
+  const day = DAYS[dayOfWeek] || 'Sunday';
+  const [hour, minute] = time.split(':').map(Number);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    return '';
+  }
+
+  const hour12 = hour % 12 || 12;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const minuteLabel = String(minute).padStart(2, '0');
 
   return `Every ${day} at ${hour12}:${minuteLabel} ${period}`;
+}
+
+function applySavedSettings(data: BotSettings) {
+  return {
+    messageText: data.messageText || '',
+    slackChannelId: data.slackChannelId || '',
+    scheduleMode: data.scheduleMode === 'weekly' ? ('weekly' as ScheduleMode) : ('now' as ScheduleMode),
+    scheduleCron: data.scheduleCron || '',
+    scheduleDayOfWeek: data.scheduleDayOfWeek ?? 0,
+    scheduleTime: data.scheduleTime || '12:00',
+    botStatus:
+      data.status === 'Paused'
+        ? ('Paused' as BotStatus)
+        : data.status === 'Active'
+          ? ('Active' as BotStatus)
+          : ('Inactive' as BotStatus),
+    scheduleStatus: data.scheduleStatus || 'No schedule active',
+  };
 }
 
 export default function HomePage() {
   const [messageText, setMessageText] = useState('');
   const [slackChannelId, setSlackChannelId] = useState('');
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('now');
+  const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState(0);
+  const [scheduleTime, setScheduleTime] = useState('12:00');
+  const [useAdvancedCron, setUseAdvancedCron] = useState(false);
   const [scheduleCron, setScheduleCron] = useState('');
-  const [botStatus, setBotStatus] = useState<'Active' | 'Paused'>('Active');
+  const [weeklyStatus, setWeeklyStatus] = useState<BotStatus>('Active');
+  const [savedScheduleStatus, setSavedScheduleStatus] =
+    useState<ScheduleStatus>('No schedule active');
   const [secret, setSecret] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [controlsEnabled, setControlsEnabled] = useState(false);
-  const [loading, setLoading] = useState<'save' | 'send' | null>(null);
+  const [loading, setLoading] = useState<'save' | 'send' | 'cancel' | null>(null);
 
   const schedulePreview = useMemo(() => {
-    if (scheduleMode !== 'weekly' || !scheduleCron.trim()) {
+    if (scheduleMode !== 'weekly') {
       return '';
     }
 
-    return describeCronClient(scheduleCron);
-  }, [scheduleMode, scheduleCron]);
+    if (useAdvancedCron && scheduleCron.trim()) {
+      const parts = scheduleCron.trim().split(/\s+/);
+      if (parts.length === 5) {
+        const [minute, hour, , , dayOfWeek] = parts;
+        const time = `${String(Number(hour)).padStart(2, '0')}:${String(Number(minute)).padStart(2, '0')}`;
+        return describeSchedulePreview(Number(dayOfWeek), time);
+      }
+    }
+
+    return describeSchedulePreview(scheduleDayOfWeek, scheduleTime);
+  }, [
+    scheduleMode,
+    useAdvancedCron,
+    scheduleCron,
+    scheduleDayOfWeek,
+    scheduleTime,
+  ]);
 
   const canSendNow =
     Boolean(secret) && Boolean(messageText.trim()) && Boolean(slackChannelId.trim());
+
+  const canSaveWeekly =
+    Boolean(secret) &&
+    Boolean(messageText.trim()) &&
+    Boolean(slackChannelId.trim()) &&
+    /^[CG]/i.test(slackChannelId.trim()) &&
+    (useAdvancedCron ? Boolean(scheduleCron.trim()) : Boolean(scheduleTime));
+
+  const canCancelSchedule =
+    Boolean(secret) &&
+    savedScheduleStatus !== 'No schedule active';
 
   function clearForm() {
     setMessageText('');
     setSlackChannelId('');
     setScheduleMode('now');
+    setScheduleDayOfWeek(0);
+    setScheduleTime('12:00');
+    setUseAdvancedCron(false);
     setScheduleCron('');
-    setBotStatus('Active');
+    setWeeklyStatus('Active');
+  }
+
+  function loadSettingsIntoForm(data: BotSettings) {
+    const applied = applySavedSettings(data);
+    setMessageText(applied.messageText);
+    setSlackChannelId(applied.slackChannelId);
+    setScheduleMode(applied.scheduleMode);
+    setScheduleDayOfWeek(applied.scheduleDayOfWeek);
+    setScheduleTime(applied.scheduleTime);
+    setScheduleCron(applied.scheduleCron);
+    setWeeklyStatus(applied.botStatus);
+    setSavedScheduleStatus(applied.scheduleStatus);
   }
 
   useEffect(() => {
@@ -83,21 +156,16 @@ export default function HomePage() {
       .then((data: BotSettings) => {
         setControlsEnabled(Boolean(data.testSendEnabled));
 
-        if (!data.hasSavedSettings) {
-          return;
+        if (data.hasSavedSettings) {
+          loadSettingsIntoForm(data);
+        } else {
+          setSavedScheduleStatus('No schedule active');
         }
-
-        setMessageText(data.messageText || '');
-        setSlackChannelId(data.slackChannelId || '');
-        setScheduleMode(data.scheduleMode === 'weekly' ? 'weekly' : 'now');
-        setScheduleCron(data.scheduleCron || '');
-        setBotStatus(data.status === 'Paused' ? 'Paused' : 'Active');
       })
       .catch(() => setStatusMessage('Could not load bot settings.'));
   }, []);
 
-  async function handleSaveWeeklySettings(event: FormEvent) {
-    event.preventDefault();
+  async function handleSaveWeeklySettings() {
     setLoading('save');
     setStatusMessage('');
 
@@ -110,11 +178,14 @@ export default function HomePage() {
         },
         body: JSON.stringify({
           secret,
-          messageText,
-          slackChannelId,
+          messageText: messageText.trim(),
+          slackChannelId: slackChannelId.trim(),
           scheduleMode: 'weekly',
-          scheduleCron,
-          status: botStatus,
+          scheduleDayOfWeek,
+          scheduleTime,
+          useAdvancedCron,
+          scheduleCron: useAdvancedCron ? scheduleCron.trim() : '',
+          status: weeklyStatus,
         }),
       });
 
@@ -125,9 +196,52 @@ export default function HomePage() {
         return;
       }
 
+      if (data.settings) {
+        loadSettingsIntoForm(data.settings);
+      }
+
       setStatusMessage('Weekly settings saved.');
     } catch {
       setStatusMessage('Network error while saving weekly settings.');
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleCancelSchedule() {
+    setLoading('cancel');
+    setStatusMessage('');
+
+    try {
+      const response = await fetch('/api/settings/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${secret}`,
+        },
+        body: JSON.stringify({ secret }),
+      });
+
+      const data: ActionResult = await response.json();
+
+      if (!response.ok) {
+        setStatusMessage(data.error || 'Failed to cancel schedule.');
+        return;
+      }
+
+      if (data.settings) {
+        loadSettingsIntoForm(data.settings);
+        setScheduleMode('now');
+        setScheduleDayOfWeek(0);
+        setScheduleTime('12:00');
+        setUseAdvancedCron(false);
+        setScheduleCron('');
+        setWeeklyStatus('Inactive');
+      }
+
+      setStatusMessage(data.message || 'Schedule cancelled.');
+    } catch {
+      setStatusMessage('Network error while cancelling schedule.');
     } finally {
       setLoading(null);
     }
@@ -170,10 +284,14 @@ export default function HomePage() {
   return (
     <main className="page">
       <section className="card">
-        <p className="eyebrow">Technest Community</p>
+        <p className="eyebrow">Magret</p>
         <h1>TechNest Slack Bot</h1>
         <p className="description">
           Send a message to a Slack channel now or on a weekly schedule.
+        </p>
+
+        <p className={`schedule-status schedule-status-${savedScheduleStatus.replace(/\s+/g, '-').toLowerCase()}`}>
+          Schedule status: <strong>{savedScheduleStatus}</strong>
         </p>
 
         {controlsEnabled ? (
@@ -223,46 +341,96 @@ export default function HomePage() {
             </fieldset>
 
             {scheduleMode === 'weekly' ? (
-              <form onSubmit={handleSaveWeeklySettings}>
-                <label htmlFor="scheduleCron">Cron expression</label>
+              <div className="weekly-panel">
+                <label htmlFor="scheduleDayOfWeek">Day of week</label>
+                <select
+                  id="scheduleDayOfWeek"
+                  value={scheduleDayOfWeek}
+                  onChange={(event) =>
+                    setScheduleDayOfWeek(Number(event.target.value))
+                  }
+                  disabled={useAdvancedCron}
+                >
+                  {DAYS.map((day, index) => (
+                    <option key={day} value={index}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+
+                <label htmlFor="scheduleTime">Time</label>
                 <input
-                  id="scheduleCron"
-                  type="text"
-                  value={scheduleCron}
-                  onChange={(event) => setScheduleCron(event.target.value)}
-                  placeholder="0 12 * * 0"
-                  required
+                  id="scheduleTime"
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(event) => setScheduleTime(event.target.value)}
+                  disabled={useAdvancedCron}
                 />
+
                 {schedulePreview ? (
                   <p className="preview">
                     Schedule preview: <strong>{schedulePreview}</strong>
                   </p>
-                ) : (
-                  <p className="note">
-                    Example preview: Every Sunday at 12:00 PM
-                  </p>
-                )}
+                ) : null}
+
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={useAdvancedCron}
+                    onChange={(event) => setUseAdvancedCron(event.target.checked)}
+                  />
+                  Advanced cron
+                </label>
+
+                {useAdvancedCron ? (
+                  <>
+                    <label htmlFor="scheduleCron">Cron expression</label>
+                    <input
+                      id="scheduleCron"
+                      type="text"
+                      value={scheduleCron}
+                      onChange={(event) => setScheduleCron(event.target.value)}
+                      placeholder="0 12 * * 0"
+                    />
+                  </>
+                ) : null}
 
                 <p className="note weekly-note">
-                  Save settings to activate this weekly schedule.
+                  Save weekly settings to activate this schedule. Send now does
+                  not create a weekly schedule.
                 </p>
 
-                <label htmlFor="botStatus">Status</label>
+                <label htmlFor="weeklyStatus">Weekly schedule status</label>
                 <select
-                  id="botStatus"
-                  value={botStatus}
+                  id="weeklyStatus"
+                  value={weeklyStatus === 'Inactive' ? 'Paused' : weeklyStatus}
                   onChange={(event) =>
-                    setBotStatus(event.target.value as 'Active' | 'Paused')
+                    setWeeklyStatus(event.target.value as 'Active' | 'Paused')
                   }
                 >
                   <option value="Active">Active</option>
                   <option value="Paused">Paused</option>
                 </select>
 
-                <button type="submit" disabled={loading !== null || !secret}>
-                  {loading === 'save' ? 'Saving…' : 'Save weekly settings'}
-                </button>
-              </form>
+                <div className="button-row weekly-actions">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={loading !== null || !canSaveWeekly}
+                    onClick={handleSaveWeeklySettings}
+                  >
+                    {loading === 'save' ? 'Saving…' : 'Save weekly settings'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={loading !== null || !canCancelSchedule}
+                    onClick={handleCancelSchedule}
+                  >
+                    {loading === 'cancel' ? 'Cancelling…' : 'Cancel schedule'}
+                  </button>
+                </div>
+              </div>
             ) : null}
 
             <label htmlFor="secret">API secret</label>
@@ -278,6 +446,7 @@ export default function HomePage() {
             <div className="button-row">
               <button
                 type="button"
+                className="btn-primary"
                 disabled={loading !== null || !canSendNow}
                 onClick={handleSendNow}
               >

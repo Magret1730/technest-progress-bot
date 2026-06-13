@@ -2,18 +2,18 @@ require('dotenv').config();
 
 const cron = require('node-cron');
 const { sendMessage, formatSlackError } = require('../lib/slack');
-const { getSettings } = require('../lib/settings');
+const { getSettings, isScheduleSendEnabled } = require('../lib/settings');
 
 async function startScheduler() {
   const settings = await getSettings();
 
   if (!settings.hasSavedSettings) {
-    console.error('No saved settings found. Save settings on the dashboard first.');
+    console.error('No saved settings found. Save weekly settings on the dashboard first.');
     process.exit(1);
   }
 
-  if (settings.scheduleMode !== 'weekly') {
-    console.error('Weekly schedule is not enabled. Choose "Schedule weekly" and save settings.');
+  if (!isScheduleSendEnabled(settings)) {
+    console.error('No active weekly schedule. Save or activate weekly settings first.');
     process.exit(1);
   }
 
@@ -25,7 +25,7 @@ async function startScheduler() {
   console.log('Slack weekly scheduler running.');
   console.log(`Message: "${settings.messageText}"`);
   console.log(`Channel: ${settings.slackChannelId}`);
-  console.log(`Bot status: ${settings.status}`);
+  console.log(`Schedule status: ${settings.scheduleStatus}`);
   console.log(`Schedule: ${settings.scheduleCron} (${settings.scheduleDescription}, local time)`);
   console.log('Press Ctrl+C to stop.\n');
 
@@ -34,13 +34,8 @@ async function startScheduler() {
     try {
       const current = await getSettings();
 
-      if (current.status === 'Paused') {
-        console.log(`[${timestamp}] Skipped: bot status is Paused`);
-        return;
-      }
-
-      if (current.scheduleMode !== 'weekly') {
-        console.log(`[${timestamp}] Skipped: schedule mode is not weekly`);
+      if (!isScheduleSendEnabled(current)) {
+        console.log(`[${timestamp}] Skipped: no active weekly schedule`);
         return;
       }
 

@@ -11,6 +11,9 @@ type SettingsBody = {
   slackChannelId?: string;
   scheduleMode?: string;
   scheduleCron?: string;
+  scheduleDayOfWeek?: number | string;
+  scheduleTime?: string;
+  useAdvancedCron?: boolean;
   status?: string;
 };
 

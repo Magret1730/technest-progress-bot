@@ -44,16 +44,26 @@ Open the app and configure:
 | **Message** | Text to send |
 | **Slack channel ID** | Target channel (`C...` or `G...`) |
 | **Schedule** | Send now, or schedule weekly |
-| **Cron expression** | Required when weekly is selected (example: `0 12 * * 0`) |
-| **Status** | Active or Paused |
+| **Day of week / Time** | Friendly weekly schedule inputs (cron is generated automatically) |
+| **Advanced cron** | Optional raw cron expression for power users |
+| **Weekly schedule status** | Active or Paused |
 | **API secret** | Your `TEST_API_SECRET` |
+
+Schedule status at the top shows one of:
+
+- **No schedule active** — no weekly cron is saved
+- **Schedule active** — weekly schedule is saved and Active
+- **Paused** — weekly schedule is saved but paused
 
 Buttons:
 
-- **Save settings** — persists to local JSON or Vercel KV
-- **Send now** — sends immediately (works even when Paused)
+- **Send now** — sends immediately using the current form values. Does **not** create or change a weekly schedule.
+- **Save weekly settings** — persists message, channel, weekly schedule, and status for Vercel cron
+- **Cancel schedule** — clears the saved weekly cron, switches mode to send now, and stops scheduled sends
 
-When **Paused**, scheduled sends are skipped. Manual **Send now** still works.
+Use **Cancel schedule** when you want to stop weekly sends entirely. **Send now** only sends once and does not activate a weekly schedule.
+
+When **Paused**, scheduled sends are skipped but saved settings remain. Manual **Send now** still works.
 
 ---
 
@@ -80,7 +90,8 @@ npm run check-slack
 |-------|--------|---------|
 | `/api/health` | GET | App health check |
 | `/api/settings` | GET | Read saved settings |
-| `/api/settings` | POST | Save settings (requires `TEST_API_SECRET`) |
+| `/api/settings` | POST | Save weekly settings (requires `TEST_API_SECRET`) |
+| `/api/settings/cancel` | POST | Cancel weekly schedule (requires `TEST_API_SECRET`) |
 | `/api/send-message` | POST | Send now (requires `TEST_API_SECRET`) |
 | `/api/cron/send-message` | GET | Weekly cron send (requires `CRON_SECRET`) |
 
@@ -92,7 +103,7 @@ npm run check-slack
 2. Import in Vercel
 3. Add Vercel KV for persistent settings
 4. Set `SLACK_BOT_TOKEN`, `TEST_API_SECRET`, `CRON_SECRET`, and KV env vars
-5. [`vercel.json`](vercel.json) runs the cron job — it only sends when saved settings use **Schedule weekly** and status is **Active**
+5. [`vercel.json`](vercel.json) runs the cron job — it only sends when saved settings use **Schedule weekly**, status is **Active**, and a cron expression exists
 
 Vercel Cron uses **UTC**. Adjust the cron schedule in `vercel.json` if needed.
 
