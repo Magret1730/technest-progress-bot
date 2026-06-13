@@ -30,8 +30,15 @@ Never commit `.env`.
 2. Add bot scope: **`chat:write`**
 3. Install the app to your workspace
 4. Copy the **Bot User OAuth Token** into `.env` as `SLACK_BOT_TOKEN`
-5. Create or choose a Slack channel and invite the bot with `/invite @YourBotName`
-6. Copy the channel ID (starts with **C** for public or **G** for private)
+5. Choose a destination:
+   - **Channel** — create or pick a channel and invite the bot with `/invite @YourBotName`
+   - **Direct message** — use an existing DM conversation ID (starts with **D**)
+6. Copy the destination ID:
+   - **C** = public channel
+   - **G** = private channel
+   - **D** = direct message conversation
+
+Messages are sent with `chat.postMessage` using the destination ID directly.
 
 ---
 
@@ -42,7 +49,7 @@ Open the app and configure:
 | Field | Description |
 |-------|-------------|
 | **Message** | Text to send |
-| **Slack channel ID** | Target channel (`C...` or `G...`) |
+| **Slack Destination ID** | Target channel or DM (`C...`, `G...`, or `D...`) |
 | **Schedule** | Send now, or schedule weekly |
 | **Day of week / Time** | Friendly weekly schedule inputs (cron is generated automatically) |
 | **Advanced cron** | Optional raw cron expression for power users |
@@ -114,9 +121,10 @@ Vercel Cron uses **UTC**. Adjust the cron schedule in `vercel.json` if needed.
 | Error | Fix |
 |-------|-----|
 | `SLACK_BOT_TOKEN is missing` | Add token to `.env` or Vercel |
-| `Channel ID is required` | Enter a channel ID on the dashboard and save |
-| `Channel ID must start with C or G` | Use a valid Slack channel ID |
-| `The bot is not in this channel` | `/invite @YourBotName` in the channel |
+| `Slack destination ID is required` | Enter a destination ID on the dashboard |
+| `Destination ID must start with C, G, or D` | Use a valid Slack channel or DM conversation ID |
+| `The bot is not in this channel` | `/invite @YourBotName` in the channel (channels only) |
+| `Destination not found` | Check the ID; for DMs use an existing conversation ID |
 | `Unauthorized` | Enter your `TEST_API_SECRET` on the dashboard |
 | Settings reset on Vercel | Link a Vercel KV store |
 

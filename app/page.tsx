@@ -120,7 +120,7 @@ export default function HomePage() {
     Boolean(secret) &&
     Boolean(messageText.trim()) &&
     Boolean(slackChannelId.trim()) &&
-    /^[CG]/i.test(slackChannelId.trim()) &&
+    /^[CGD]/i.test(slackChannelId.trim()) &&
     (useAdvancedCron ? Boolean(scheduleCron.trim()) : Boolean(scheduleTime));
 
   const canCancelSchedule =
@@ -284,7 +284,7 @@ export default function HomePage() {
   return (
     <main className="page">
       <section className="card">
-        <p className="eyebrow">Magret</p>
+        <p className="eyebrow">Magret Slack Bot</p>
         <h1>TechNest Slack Bot</h1>
         <p className="description">
           Send a message to a Slack channel now or on a weekly schedule.
@@ -304,7 +304,7 @@ export default function HomePage() {
               rows={4}
             />
 
-            <label htmlFor="slackChannelId">Slack channel ID</label>
+            <label htmlFor="slackChannelId">Slack Destination ID</label>
             <input
               id="slackChannelId"
               type="text"
@@ -312,8 +312,9 @@ export default function HomePage() {
               onChange={(event) => setSlackChannelId(event.target.value)}
             />
             <p className="note">
-              Channel IDs usually start with <code>C</code> or <code>G</code>.
-              The bot must be invited to the channel.
+              <code>C</code> = public channel, <code>G</code> = private channel,{' '}
+              <code>D</code> = direct message conversation. For channels, invite
+              the bot with <code>/invite @YourBotName</code>.
             </p>
 
             <fieldset className="schedule-fieldset">

@@ -24,7 +24,7 @@ async function startScheduler() {
 
   console.log('Slack weekly scheduler running.');
   console.log(`Message: "${settings.messageText}"`);
-  console.log(`Channel: ${settings.slackChannelId}`);
+  console.log(`Destination: ${settings.slackChannelId}`);
   console.log(`Schedule status: ${settings.scheduleStatus}`);
   console.log(`Schedule: ${settings.scheduleCron} (${settings.scheduleDescription}, local time)`);
   console.log('Press Ctrl+C to stop.\n');

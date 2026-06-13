@@ -11,16 +11,16 @@ async function main() {
   console.log('------------------');
 
   if (!settings.hasSavedSettings) {
-    console.error('No saved settings found. Save message and channel ID on the dashboard first.');
+    console.error('No saved settings found. Save message and destination ID on the dashboard first.');
     process.exit(1);
   }
 
-  console.log(`Channel ID: ${settings.slackChannelId}`);
+  console.log(`Destination ID: ${settings.slackChannelId}`);
   console.log(`Schedule mode: ${settings.scheduleMode}`);
   console.log(`Status: ${settings.status}`);
 
-  if (!/^[CG]/i.test(settings.slackChannelId)) {
-    console.error('Channel ID must start with C or G.');
+  if (!/^[CGD]/i.test(settings.slackChannelId)) {
+    console.error('Destination ID must start with C, G, or D.');
     process.exit(1);
   }
 
@@ -39,7 +39,7 @@ async function main() {
     console.log('Config looks good. Run: npm run send');
   } catch (error) {
     console.error(`\nError: ${formatSlackError(error)}`);
-    console.log('\nMake sure the bot has been invited to the channel.');
+    console.log('\nMake sure the bot can reach the destination. For channels, invite the bot. For DMs, use an existing conversation ID.');
     process.exit(1);
   }
 }
