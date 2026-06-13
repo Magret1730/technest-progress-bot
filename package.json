@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "clean": "rm -rf .next",
     "send": "node src/send-message.js",
     "schedule": "node src/schedule.js",
     "check-slack": "node src/check-slack.js"

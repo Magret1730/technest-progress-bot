@@ -5,13 +5,10 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 type ScheduleMode = 'now' | 'weekly';
 
 type BotSettings = {
-  appName: string;
-  description: string;
   messageText: string;
   slackChannelId: string;
   scheduleMode: ScheduleMode;
   scheduleCron: string;
-  scheduleDescription: string;
   status: 'Active' | 'Paused';
   hasSavedSettings: boolean;
   testSendEnabled: boolean;
@@ -22,7 +19,6 @@ type ActionResult = {
   error?: string;
   text?: string;
   channel?: string;
-  settings?: BotSettings;
 };
 
 function describeCronClient(expression: string) {
@@ -70,6 +66,17 @@ export default function HomePage() {
     return describeCronClient(scheduleCron);
   }, [scheduleMode, scheduleCron]);
 
+  const canSendNow =
+    Boolean(secret) && Boolean(messageText.trim()) && Boolean(slackChannelId.trim());
+
+  function clearForm() {
+    setMessageText('');
+    setSlackChannelId('');
+    setScheduleMode('now');
+    setScheduleCron('');
+    setBotStatus('Active');
+  }
+
   useEffect(() => {
     fetch('/api/settings')
       .then((res) => res.json())
@@ -89,7 +96,7 @@ export default function HomePage() {
       .catch(() => setStatusMessage('Could not load bot settings.'));
   }, []);
 
-  async function handleSaveSettings(event: FormEvent) {
+  async function handleSaveWeeklySettings(event: FormEvent) {
     event.preventDefault();
     setLoading('save');
     setStatusMessage('');
@@ -105,7 +112,7 @@ export default function HomePage() {
           secret,
           messageText,
           slackChannelId,
-          scheduleMode,
+          scheduleMode: 'weekly',
           scheduleCron,
           status: botStatus,
         }),
@@ -114,20 +121,19 @@ export default function HomePage() {
       const data: ActionResult = await response.json();
 
       if (!response.ok) {
-        setStatusMessage(data.error || 'Failed to save settings.');
+        setStatusMessage(data.error || 'Failed to save weekly settings.');
         return;
       }
 
-      setStatusMessage('Settings saved.');
+      setStatusMessage('Weekly settings saved.');
     } catch {
-      setStatusMessage('Network error while saving settings.');
+      setStatusMessage('Network error while saving weekly settings.');
     } finally {
       setLoading(null);
     }
   }
 
-  async function handleSendNow(event: FormEvent) {
-    event.preventDefault();
+  async function handleSendNow() {
     setLoading('send');
     setStatusMessage('');
 
@@ -140,8 +146,8 @@ export default function HomePage() {
         },
         body: JSON.stringify({
           secret,
-          messageText,
-          slackChannelId,
+          messageText: messageText.trim(),
+          slackChannelId: slackChannelId.trim(),
         }),
       });
 
@@ -152,7 +158,8 @@ export default function HomePage() {
         return;
       }
 
-      setStatusMessage(`Sent "${data.text}" to ${data.channel}.`);
+      clearForm();
+      setStatusMessage('Message sent successfully.');
     } catch {
       setStatusMessage('Network error while sending message.');
     } finally {
@@ -170,14 +177,13 @@ export default function HomePage() {
         </p>
 
         {controlsEnabled ? (
-          <form className="settings-form" onSubmit={handleSaveSettings}>
+          <div className="settings-form">
             <label htmlFor="messageText">Message</label>
             <textarea
               id="messageText"
               value={messageText}
               onChange={(event) => setMessageText(event.target.value)}
               rows={4}
-              required
             />
 
             <label htmlFor="slackChannelId">Slack channel ID</label>
@@ -186,7 +192,6 @@ export default function HomePage() {
               type="text"
               value={slackChannelId}
               onChange={(event) => setSlackChannelId(event.target.value)}
-              required
             />
             <p className="note">
               Channel IDs usually start with <code>C</code> or <code>G</code>.
@@ -218,7 +223,7 @@ export default function HomePage() {
             </fieldset>
 
             {scheduleMode === 'weekly' ? (
-              <>
+              <form onSubmit={handleSaveWeeklySettings}>
                 <label htmlFor="scheduleCron">Cron expression</label>
                 <input
                   id="scheduleCron"
@@ -237,20 +242,28 @@ export default function HomePage() {
                     Example preview: Every Sunday at 12:00 PM
                   </p>
                 )}
-              </>
-            ) : null}
 
-            <label htmlFor="botStatus">Status</label>
-            <select
-              id="botStatus"
-              value={botStatus}
-              onChange={(event) =>
-                setBotStatus(event.target.value as 'Active' | 'Paused')
-              }
-            >
-              <option value="Active">Active</option>
-              <option value="Paused">Paused</option>
-            </select>
+                <p className="note weekly-note">
+                  Save settings to activate this weekly schedule.
+                </p>
+
+                <label htmlFor="botStatus">Status</label>
+                <select
+                  id="botStatus"
+                  value={botStatus}
+                  onChange={(event) =>
+                    setBotStatus(event.target.value as 'Active' | 'Paused')
+                  }
+                >
+                  <option value="Active">Active</option>
+                  <option value="Paused">Paused</option>
+                </select>
+
+                <button type="submit" disabled={loading !== null || !secret}>
+                  {loading === 'save' ? 'Saving…' : 'Save weekly settings'}
+                </button>
+              </form>
+            ) : null}
 
             <label htmlFor="secret">API secret</label>
             <input
@@ -260,28 +273,18 @@ export default function HomePage() {
               onChange={(event) => setSecret(event.target.value)}
               placeholder="Enter TEST_API_SECRET"
               autoComplete="off"
-              required
             />
 
             <div className="button-row">
-              <button type="submit" disabled={loading !== null || !secret}>
-                {loading === 'save' ? 'Saving…' : 'Save settings'}
-              </button>
               <button
                 type="button"
-                className="secondary"
-                disabled={
-                  loading !== null ||
-                  !secret ||
-                  !messageText.trim() ||
-                  !slackChannelId.trim()
-                }
+                disabled={loading !== null || !canSendNow}
                 onClick={handleSendNow}
               >
                 {loading === 'send' ? 'Sending…' : 'Send now'}
               </button>
             </div>
-          </form>
+          </div>
         ) : (
           <p className="note">
             Dashboard controls are disabled. Set <code>TEST_API_SECRET</code> in
