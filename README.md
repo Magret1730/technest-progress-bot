@@ -100,12 +100,41 @@ Switch **Destination type** to **User** on the dashboard to send via DM using `c
 
 ---
 
+## Create a private channel from the dashboard
+
+You can create a delivery channel without leaving the app.
+
+1. Open the dashboard and enter your `TEST_API_SECRET`
+2. In **Create private channel**, enter a name (example: `chan-progress-updates`)
+3. Click **Create private channel**
+
+The server calls Slack’s `conversations.create` API with `is_private: true`. All Slack API calls run server-side only — the bot token is never exposed to the browser.
+
+After creation, the app automatically:
+
+- saves the new channel ID as `slackChannelId`
+- sets **Destination type** to **Channel**
+- adds the bot to the created channel
+
+**Invite Chan Meng manually:** open the new private channel in Slack and run `/invite @chan` or use **Add people**. The app does not invite users unless your Slack app has additional user-invite permissions.
+
+### Channel creation errors
+
+| Slack error | Meaning |
+|-------------|---------|
+| `missing_scope` | Add `groups:write` and `channels:manage`, then reinstall the app |
+| `name_taken` | Pick a different channel name |
+| `invalid_name` | Use lowercase letters, numbers, hyphens, and underscores only |
+
+---
+
 ## Editable dashboard
 
 Open the app in your browser and use the dashboard to manage bot settings.
 
 ### What you can edit
 
+- **Create private channel** — creates a Slack channel and sets it as the destination
 - **Destination type** — `Channel` (default) or `User`
 - **Channel ID** or **User ID** — saved to persistent storage
 - **Weekly message** — the Slack message text
@@ -157,7 +186,11 @@ Save and test actions require `TEST_API_SECRET`. Random visitors cannot change s
 **OAuth & Permissions** → **Bot Token Scopes**:
 
 - `chat:write` — post messages to channels
-- `im:write` — only needed for User delivery mode
+- `im:write` — User delivery mode (optional fallback)
+- `channels:manage` — manage public channels
+- `groups:write` — create private channels from the dashboard
+
+After adding scopes, **reinstall the app** to Technest Community.
 
 ### Step 3 — Install and copy token
 
@@ -209,6 +242,7 @@ The local scheduler reads saved settings from `data/settings.json` when availabl
 | `/api/health` | GET | Confirms the app is live |
 | `/api/settings` | GET | Read current bot settings (no secrets) |
 | `/api/settings` | POST | Save settings (requires `TEST_API_SECRET`) |
+| `/api/channels/create` | POST | Create private channel (requires `TEST_API_SECRET`) |
 | `/api/config` | GET | Alias of `/api/settings` |
 | `/api/send-message` | POST | Manual test send (requires `TEST_API_SECRET`) |
 | `/api/cron/send-message` | GET | Weekly send for Vercel Cron (requires `CRON_SECRET`) |
@@ -312,7 +346,9 @@ slack/
 | `Channel not found` | Confirm channel ID, invite bot with `/invite @YourBotName` |
 | `The bot is not in this channel` | Invite the bot to the target channel |
 | `No channel ID configured` | Set `SLACK_CHANNEL_ID` in `.env` or save one on the dashboard |
-| `Unauthorized` on save/test | Set `TEST_API_SECRET` and enter it on the dashboard |
+| `name_taken` | Pick a different channel name on the dashboard |
+| `invalid_name` | Use lowercase letters, numbers, hyphens, and underscores only |
+| `missing_scope` (channel creation) | Add `groups:write` and `channels:manage`, then reinstall |
 | Settings reset on Vercel | Create and link a Vercel KV store |
 | Scheduled send still runs while Paused | Confirm you clicked **Save settings** and status is `Paused` |
 
