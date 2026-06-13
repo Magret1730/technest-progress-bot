@@ -1,0 +1,44 @@
+ Hi, I'm in the Technest Community Slack workspace, and I'm going to create
+ a Slack application to help me send a message to
+ https://app.slack.com/huddle/T07U7P7123Z/D0ATNMZ78AH .
+ If you want to have the secret keys, please write down the tutorial so that
+ I can follow the steps to grant this secret key.
+
+ I want to send a message "Hello Chan" every sunday to
+ Chanhttps://app.slack.com/huddle/T07U7P7123Z/D0ATNMZ78AH 
+
+ The Slack app is set up in the slack/ folder. Here is what you have and how to use it.
+
+What was built
+File	Purpose
+src/send-message.js
+Sends "Hello Chan" to DM D0ATNMZ78AH
+src/schedule.js
+Runs every Sunday at 12:00 PM local time
+.env.example
+Template for your secrets
+README.md
+Full tutorial for creating the Slack app and getting tokens
+Your next steps
+1. Create the Slack app and get your token — follow README.md Part 1:
+
+Create app at api.slack.com/apps
+Add scopes: chat:write, im:write
+Install to Technest Community
+Copy the Bot User OAuth Token (xoxb-...)
+2. Configure .env:
+
+cd slack
+cp .env.example .env
+# Edit .env and paste your real xoxb token
+3. Invite the bot to Chan's DM:
+
+/invite @YourBotName
+4. Test it:
+
+npm run send        # sends "Hello Chan" now
+npm run schedule    # runs every Sunday at 12:00 PM
+The schedule is set to 0 12 * * 0 (Sunday noon, your local time). You can change it anytime in .env via SCHEDULE_CRON.
+
+Note: npm run schedule only works while that process is running. For fire-and-forget scheduling, the README includes a macOS crontab option that calls npm run send each Sunday without keeping Node open.
+

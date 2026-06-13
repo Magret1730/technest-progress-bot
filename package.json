@@ -1,0 +1,29 @@
+{
+  "name": "technest-progress-bot",
+  "version": "1.0.0",
+  "description": "TechNest Slack Bot — weekly progress updates to Chan Meng",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "send": "node src/send-message.js",
+    "schedule": "node src/schedule.js"
+  },
+  "keywords": ["slack", "technest", "vercel"],
+  "license": "MIT",
+  "dependencies": {
+    "@slack/web-api": "^7.9.1",
+    "dotenv": "^16.5.0",
+    "next": "^15.3.3",
+    "node-cron": "^3.0.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "typescript": "^5.8.3"
+  }
+}
