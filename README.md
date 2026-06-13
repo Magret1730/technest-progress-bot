@@ -27,18 +27,20 @@ Never commit `.env`.
 ## Slack app setup
 
 1. Create an app at [api.slack.com/apps](https://api.slack.com/apps)
-2. Add bot scope: **`chat:write`**
+2. Add bot scopes: **`chat:write`** and **`im:write`** (required for member IDs starting with **U**)
 3. Install the app to your workspace
 4. Copy the **Bot User OAuth Token** into `.env` as `SLACK_BOT_TOKEN`
 5. Choose a destination:
    - **Channel** — create or pick a channel and invite the bot with `/invite @YourBotName`
    - **Direct message** — use an existing DM conversation ID (starts with **D**)
+   - **Member** — use a Slack member ID (starts with **U**); the bot opens a DM automatically
 6. Copy the destination ID:
    - **C** = public channel
    - **G** = private channel
-   - **D** = direct message conversation
+   - **D** = DM conversation
+   - **U** = Slack member ID
 
-Messages are sent with `chat.postMessage` using the destination ID directly.
+For **C**, **G**, and **D** IDs, messages are sent with `chat.postMessage` directly. For **U** member IDs, the bot calls `conversations.open` first, then sends to the returned DM channel.
 
 ---
 
@@ -49,7 +51,7 @@ Open the app and configure:
 | Field | Description |
 |-------|-------------|
 | **Message** | Text to send |
-| **Slack Destination ID** | Target channel or DM (`C...`, `G...`, or `D...`) |
+| **Slack Destination ID** | Target channel, DM, or member (`C...`, `G...`, `D...`, or `U...`) |
 | **Schedule** | Send now, or schedule weekly |
 | **Day of week / Time** | Friendly weekly schedule inputs (cron is generated automatically) |
 | **Advanced cron** | Optional raw cron expression for power users |
@@ -122,9 +124,10 @@ Vercel Cron uses **UTC**. Adjust the cron schedule in `vercel.json` if needed.
 |-------|-----|
 | `SLACK_BOT_TOKEN is missing` | Add token to `.env` or Vercel |
 | `Slack destination ID is required` | Enter a destination ID on the dashboard |
-| `Destination ID must start with C, G, or D` | Use a valid Slack channel or DM conversation ID |
+| `Destination ID must start with C, G, D, or U` | Use a valid Slack channel, DM, or member ID |
 | `The bot is not in this channel` | `/invite @YourBotName` in the channel (channels only) |
 | `Destination not found` | Check the ID; for DMs use an existing conversation ID |
+| `Member not found` | Check the Slack member ID (starts with **U**) |
 | `Unauthorized` | Enter your `TEST_API_SECRET` on the dashboard |
 | Settings reset on Vercel | Link a Vercel KV store |
 

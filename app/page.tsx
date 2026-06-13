@@ -120,7 +120,7 @@ export default function HomePage() {
     Boolean(secret) &&
     Boolean(messageText.trim()) &&
     Boolean(slackChannelId.trim()) &&
-    /^[CGD]/i.test(slackChannelId.trim()) &&
+    /^[CGDU]/i.test(slackChannelId.trim()) &&
     (useAdvancedCron ? Boolean(scheduleCron.trim()) : Boolean(scheduleTime));
 
   const canCancelSchedule =
@@ -313,8 +313,8 @@ export default function HomePage() {
             />
             <p className="note">
               <code>C</code> = public channel, <code>G</code> = private channel,{' '}
-              <code>D</code> = direct message conversation. For channels, invite
-              the bot with <code>/invite @YourBotName</code>.
+              <code>D</code> = DM conversation, <code>U</code> = Slack member ID.
+              For channels, invite the bot with <code>/invite @YourBotName</code>.
             </p>
 
             <fieldset className="schedule-fieldset">

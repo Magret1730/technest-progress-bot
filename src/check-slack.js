@@ -19,8 +19,8 @@ async function main() {
   console.log(`Schedule mode: ${settings.scheduleMode}`);
   console.log(`Status: ${settings.status}`);
 
-  if (!/^[CGD]/i.test(settings.slackChannelId)) {
-    console.error('Destination ID must start with C, G, or D.');
+  if (!/^[CGDU]/i.test(settings.slackChannelId)) {
+    console.error('Destination ID must start with C, G, D, or U.');
     process.exit(1);
   }
 
@@ -39,7 +39,7 @@ async function main() {
     console.log('Config looks good. Run: npm run send');
   } catch (error) {
     console.error(`\nError: ${formatSlackError(error)}`);
-    console.log('\nMake sure the bot can reach the destination. For channels, invite the bot. For DMs, use an existing conversation ID.');
+    console.log('\nMake sure the bot can reach the destination. For channels, invite the bot. For DMs, use an existing conversation ID or a member ID.');
     process.exit(1);
   }
 }
